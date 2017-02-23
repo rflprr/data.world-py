@@ -1,0 +1,9 @@
+# To be generated with the following options:
+#  swagger-codegen generate -l python --git-repo-id=data.world-py --git-user-id=datadotworld \
+#      --http-user-agent="data.world-py - 0.1.2" --invoker-package=datadotworld \
+#      -i swagger-dwapi-def.json -c swagger-codegen-config.json --release-note=""
+#
+# All we want is the actual _rest subpackage, nothing else
+
+**
+!_rest/**

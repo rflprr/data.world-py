@@ -16,7 +16,9 @@ permissions and limitations under the License.
 
 This product includes software developed at data.world, Inc.(http://www.data.world/).
 """
+from __future__ import absolute_import
 
 from .client import DataDotWorld
+from .query import Results
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'

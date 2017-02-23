@@ -19,9 +19,14 @@ This product includes software developed at data.world, Inc.(http://www.data.wor
 
 import os
 import re
+
 import requests
-import csv
-from io import StringIO
+
+from datadotworld._rest import ApiClient
+from datadotworld._rest import DatasetsApi
+from datadotworld._rest import UploadsApi
+
+from .query import Results
 
 
 class DataDotWorld:
@@ -29,7 +34,8 @@ class DataDotWorld:
 
     def __init__(self, token=None, propsfile="~/.data.world",
                  protocol="https",
-                 queryHost="query.data.world"):
+                 query_host="query.data.world", api_host="api.data.world"):
+
         regex = re.compile(r"^token\s*=\s*(\S.*)$")
         filename = os.path.expanduser(propsfile)
         self.token = token
@@ -41,36 +47,52 @@ class DataDotWorld:
             raise RuntimeError((
                 'you must either provide an API token to this constructor, or create a '
                 '.data.world file in your home directory with your API token'))
+
         self.protocol = protocol
-        self.queryHost = queryHost
+        self.query_host = query_host
+        self.apiHost = api_host
 
-    class Results:
-        def __init__(self, raw):
-            self.raw = raw
+        self._api_client = ApiClient(host="{}://{}/v0".format(protocol, api_host), header_name='Authorization',
+                                     header_value='Bearer {}'.format(token))
+        self._datasets_api = DatasetsApi(self._api_client)
+        self._uploads_api = UploadsApi(self._api_client)
 
-        def __unicode__(self):
-            return self.as_string()
+    # Dataset Operations
 
-        def __repr__(self):
-            return "{0}\n...".format(self.as_string()[:250])
+    def get_dataset(self, dataset_key=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.get_dataset(owner_id, dataset_id)
 
-        def as_string(self):
-            return self.raw
+    def create_dataset(self, owner_id=None, dataset=None):
+        return self._datasets_api.create_dataset(owner_id, dataset)
 
-        def as_stream(self):
-            return StringIO(self.raw)
+    def patch_dataset(self, dataset_key=None, dataset=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.patch_dataset(owner_id, dataset_id, dataset)
 
-        def as_dataframe(self):
-            try:
-                import pandas as pd
-            except ImportError:
-                raise RuntimeError("You need to have pandas installed to use .asDf()")
-            else:
-                return pd.read_csv(self.as_stream())
+    def replace_dataset(self, dataset_key=None, dataset=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.replace_dataset(owner_id, dataset_id, dataset)
 
-        def as_csv(self):
-            # TODO: support UTF-8 formatted CSV in Python 2.x
-            return csv.reader(self.as_stream())
+    # File Operations
+
+    def add_files_via_url(self, dataset_key=None, files=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.add_files_by_source(owner_id, dataset_id, files)
+
+    def sync_files(self, dataset_key=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.sync(owner_id, dataset_id)
+
+    def upload_files(self, dataset_key=None, files=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._uploads_api.upload_files(owner_id, dataset_id, files)
+
+    def delete_files(self, dataset_key=None, names=None):
+        owner_id, dataset_id = dataset_key.split('/')
+        return self._datasets_api.delete_files_and_sync_sources(owner_id, dataset_id, names)
+
+    # Query Operations
 
     def query(self, dataset, query, query_type="sql"):
         from . import __version__
@@ -78,7 +100,7 @@ class DataDotWorld:
             "query": query
         }
         url = "{0}://{1}/{2}/{3}".format(self.protocol,
-                                         self.queryHost,
+                                         self.query_host,
                                          query_type,
                                          dataset)
         headers = {
@@ -88,5 +110,5 @@ class DataDotWorld:
         }
         response = requests.get(url, params=params, headers=headers)
         if response.status_code == 200:
-            return DataDotWorld.Results(response.text)
+            return Results(response.text)
         raise RuntimeError('error running query.')
